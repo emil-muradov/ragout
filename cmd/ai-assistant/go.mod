@@ -3,6 +3,7 @@ module ai-assistant
 go 1.24.4
 
 require (
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/qdrant/go-client v1.15.2 // indirect
 	github.com/sheeiavellie/go-yandexgpt v1.8.0 // indirect
 	golang.org/x/net v0.28.0 // indirect

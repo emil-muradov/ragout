@@ -5,9 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/sheeiavellie/go-yandexgpt"
 )
@@ -15,6 +16,7 @@ import (
 type App struct {
 	yandexGptClient *yandexgpt.YandexGPTClient
 	vectorDbClient *qdrant.Client
+	logger *slog.Logger
 }
 
 var apiKey = os.Getenv("YANDEXGPT_API_KEY")
@@ -22,23 +24,32 @@ var catalogId = os.Getenv("YANDEX_CATALOG_ID")
 
 func InitApp() (*App, error) {
 	app := &App{}
+	app.logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
+	err := godotenv.Load("../.env")
+
+	if err != nil {
+		app.logger.Error("failed to load env file", "error", err)
+		return nil, err
+	}
+
 	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(apiKey))
 	vectorDBClient, err := internal.InitVectorDB()
 
 	if err != nil {
-		log.Fatal("Failed to initialize vector db")
+		app.logger.Error("failed to initialize vector db", "error", err)
 		return nil, err
 	}
 
 	app.vectorDbClient = vectorDBClient
 	defer app.vectorDbClient.Close()
 	internal.InitCollection(context.Background(), vectorDBClient, "real_estate")
+	app.logger.Info("app initialized")
 	return app, nil
 }
 
 func (app *App) ProcessUserRequest(ctx context.Context, input string) (string, error) {
 	if app == nil {
-		return "", errors.New("App is not initialized")
+		return "", errors.New("app is not initialized")
 	}
 	request := yandexgpt.YandexGPTRequest{
 		ModelURI: yandexgpt.MakeModelURI(catalogId, yandexgpt.YandexGPTLite, yandexgpt.VersionLatest),
@@ -61,7 +72,7 @@ func (app *App) ProcessUserRequest(ctx context.Context, input string) (string, e
 	response, err := app.yandexGptClient.GetCompletion(ctx, request)
 
 	if err != nil {
-		return "", errors.New("Request error")
+		return "", fmt.Errorf("request error: %w", err)
 	}
 
 	fmt.Println(response.Result.Alternatives[0].Message.Text)
