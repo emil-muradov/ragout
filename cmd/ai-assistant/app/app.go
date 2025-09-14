@@ -18,7 +18,7 @@ type App struct {
 	logger *slog.Logger
 }
 
-func InitApp() (*App, error) {
+func InitApp(ctx context.Context) (*App, error) {
 	app := &App{}
 	app.logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 	err := godotenv.Load("../.env")
@@ -38,7 +38,7 @@ func InitApp() (*App, error) {
 
 	app.vectorDbClient = vectorDBClient
 	defer app.vectorDbClient.Close()
-	internal.InitCollection(context.Background(), vectorDBClient, "real_estate")
+	internal.InitCollection(ctx, vectorDBClient, "real_estate")
 	app.logger.Info("app initialized")
 	return app, nil
 }

@@ -20,7 +20,7 @@ func InitVectorDB() (*qdrant.Client, error) {
 }
 
 func InitCollection(ctx context.Context, client *qdrant.Client, collectionName string) {
-	client.CreateCollection(context.Background(), &qdrant.CreateCollection{
+	client.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: collectionName,
 		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
 			Size:     4,

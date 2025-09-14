@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 )
 
@@ -22,20 +21,20 @@ func main() {
 	router := http.NewServeMux()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	app, err := InitApp()
+	app, err := InitApp(ctx)
 
 	if err != nil {
-		log.Fatal("Failed to initialize app")
+		app.logger.Error("failed to initialize app")
 		return
 	}
 
 	router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "Ready to serve!")
+		io.WriteString(w, "Ready")
 	})
 	router.HandleFunc("POST /ask", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			log.Fatal("Failed to read body")
+			app.logger.Error("failed to read body", "error", err, "request", r)
 			return
 		}
 
@@ -47,13 +46,13 @@ func main() {
 		if err != nil {
 			err := encoder.Encode(Response{Status: http.StatusInternalServerError, Message: err.Error()})
 			if err != nil {
-				log.Fatal("Failed to encode response")
+				app.logger.Error("failed to encode response", "error", err, "request", r)
 				return
 			}
 		} else {
 			err := encoder.Encode(Response{Status: http.StatusOK, Message: response})
 			if err != nil {
-				log.Fatal("Failed to encode response")
+				app.logger.Error("failed to encode response", "error", err, "request", r)
 				return
 			}
 
