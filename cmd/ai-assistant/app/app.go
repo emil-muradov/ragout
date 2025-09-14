@@ -18,9 +18,6 @@ type App struct {
 	logger *slog.Logger
 }
 
-var apiKey = os.Getenv("YANDEXGPT_API_KEY")
-var catalogId = os.Getenv("YANDEX_CATALOG_ID")
-
 func InitApp() (*App, error) {
 	app := &App{}
 	app.logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
@@ -31,7 +28,7 @@ func InitApp() (*App, error) {
 		return nil, err
 	}
 
-	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(apiKey))
+	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(os.Getenv("YANDEXGPT_API_KEY")))
 	vectorDBClient, err := internal.InitVectorDB()
 
 	if err != nil {
@@ -51,7 +48,7 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		return "", errors.New("app is not initialized")
 	}
 	request := yandexgpt.YandexGPTRequest{
-		ModelURI: yandexgpt.MakeModelURI(catalogId, yandexgpt.YandexGPTLite, yandexgpt.VersionLatest),
+		ModelURI: yandexgpt.MakeModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.YandexGPTLite, yandexgpt.VersionLatest),
 		CompletionOptions: yandexgpt.YandexGPTCompletionOptions{
 			Stream:      false,
 			Temperature: 0.7,
