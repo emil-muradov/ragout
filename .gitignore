@@ -1,2 +1,14 @@
 .env
 .DS_Store
+*
+!*.txt
+!*.md
+!*.go
+!*.sh
+!*.yml
+!*.yaml
+!*.json
+!*.toml
+!*.ini
+!*.conf
+!*.log

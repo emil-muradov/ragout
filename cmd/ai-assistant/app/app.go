@@ -4,7 +4,6 @@ import (
 	"ai-assistant/internal"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -47,7 +46,7 @@ func InitApp() (*App, error) {
 	return app, nil
 }
 
-func (app *App) ProcessUserRequest(ctx context.Context, input string) (string, error) {
+func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, error) {
 	if app == nil {
 		return "", errors.New("app is not initialized")
 	}
@@ -65,16 +64,15 @@ func (app *App) ProcessUserRequest(ctx context.Context, input string) (string, e
 			},
 			{
 				Role: yandexgpt.YandexGPTMessageRoleUser,
-				Text: input,
+				Text: msg,
 			},
 		},
 	}
 	response, err := app.yandexGptClient.GetCompletion(ctx, request)
 
 	if err != nil {
-		return "", fmt.Errorf("request error: %w", err)
+		return "", err
 	}
 
-	fmt.Println(response.Result.Alternatives[0].Message.Text)
 	return response.Result.Alternatives[0].Message.Text, nil
 }
