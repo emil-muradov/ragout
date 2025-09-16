@@ -1,6 +1,7 @@
 package main
 
 import (
+	"ai-assistant/internal"
 	"context"
 	"encoding/json"
 	"io"
@@ -18,23 +19,26 @@ type UserRequest struct {
 
 
 func main() {
-	router := http.NewServeMux()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app, err := InitApp(ctx)
+	logger := internal.InitLogger()
 
 	if err != nil {
-		app.logger.Error("failed to initialize app")
+		logger.Error("failed to initialize app", "error", err)
 		return
 	}
 
+	logger.Info("successfully initialized app")
+
+	router := http.NewServeMux()
+
 	router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "Ready")
+		io.WriteString(w, "ready to serve!")
 	})
 	router.HandleFunc("POST /ask", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			app.logger.Error("failed to read body", "error", err, "request", r)
 			return
 		}
 
@@ -46,17 +50,19 @@ func main() {
 		if err != nil {
 			err := encoder.Encode(Response{Status: http.StatusInternalServerError, Message: err.Error()})
 			if err != nil {
-				app.logger.Error("failed to encode response", "error", err, "request", r)
 				return
 			}
 		} else {
 			err := encoder.Encode(Response{Status: http.StatusOK, Message: response})
 			if err != nil {
-				app.logger.Error("failed to encode response", "error", err, "request", r)
 				return
 			}
 
 		}
 	})
-	http.ListenAndServe(":8080", router)
+	err = http.ListenAndServe(":8080", router)
+	if err != nil {
+		logger.Error("failed to start server", "error", err)
+		return
+	}
 }

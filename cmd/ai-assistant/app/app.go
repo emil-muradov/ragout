@@ -4,7 +4,6 @@ import (
 	"ai-assistant/internal"
 	"context"
 	"errors"
-	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -15,16 +14,13 @@ import (
 type App struct {
 	yandexGptClient *yandexgpt.YandexGPTClient
 	vectorDbClient *qdrant.Client
-	logger *slog.Logger
 }
 
 func InitApp(ctx context.Context) (*App, error) {
 	app := &App{}
-	app.logger = slog.New(slog.NewTextHandler(os.Stdout, nil))
 	err := godotenv.Load("../.env")
 
 	if err != nil {
-		app.logger.Error("failed to load env file", "error", err)
 		return nil, err
 	}
 
@@ -32,14 +28,13 @@ func InitApp(ctx context.Context) (*App, error) {
 	vectorDBClient, err := internal.InitVectorDB()
 
 	if err != nil {
-		app.logger.Error("failed to initialize vector db", "error", err)
 		return nil, err
 	}
 
 	app.vectorDbClient = vectorDBClient
 	defer app.vectorDbClient.Close()
 	internal.InitCollection(ctx, vectorDBClient, "real_estate")
-	app.logger.Info("app initialized")
+
 	return app, nil
 }
 
