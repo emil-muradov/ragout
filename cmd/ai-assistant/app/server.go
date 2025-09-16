@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ai-assistant/internal"
+	log "ai-assistant/internal/logger"
 	"context"
 	"encoding/json"
 	"io"
@@ -22,14 +22,14 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	app, err := InitApp(ctx)
-	logger := internal.InitLogger()
+	logger := log.CreateLogger()
 
 	if err != nil {
 		logger.Error("failed to initialize app", "error", err)
 		return
 	}
 
-	logger.Info("successfully initialized app")
+	logger.Info("app started")
 
 	router := http.NewServeMux()
 

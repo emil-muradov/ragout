@@ -1,4 +1,4 @@
-package internal
+package db
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/qdrant/go-client/qdrant"
 )
 
-func InitVectorDB() (*qdrant.Client, error) {
+func ConnectToQdrant() (*qdrant.Client, error) {
 	port, err := strconv.Atoi(os.Getenv("QDRANT_PORT"))
 	if err != nil {
 		return nil, err
@@ -19,11 +19,11 @@ func InitVectorDB() (*qdrant.Client, error) {
 	})
 }
 
-func InitCollection(ctx context.Context, client *qdrant.Client, collectionName string) {
+func CreateQdrantCollection(ctx context.Context, client *qdrant.Client, collectionName string) {
 	client.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: collectionName,
 		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-			Size:     4,
+			Size:     256,
 			Distance: qdrant.Distance_Cosine,
 		}),
 	})

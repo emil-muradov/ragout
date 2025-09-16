@@ -1,7 +1,7 @@
 package main
 
 import (
-	"ai-assistant/internal"
+	db "ai-assistant/internal/db"
 	"context"
 	"errors"
 	"os"
@@ -25,15 +25,15 @@ func InitApp(ctx context.Context) (*App, error) {
 	}
 
 	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(os.Getenv("YANDEXGPT_API_KEY")))
-	vectorDBClient, err := internal.InitVectorDB()
+	qdrantClient, err := db.ConnectToQdrant()
 
 	if err != nil {
 		return nil, err
 	}
 
-	app.vectorDbClient = vectorDBClient
+	app.vectorDbClient = qdrantClient
 	defer app.vectorDbClient.Close()
-	internal.InitCollection(ctx, vectorDBClient, "real_estate")
+	db.CreateQdrantCollection(ctx, qdrantClient, "real_estate")
 
 	return app, nil
 }
