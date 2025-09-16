@@ -2,45 +2,112 @@ package main
 
 import (
 	db "ai-assistant/internal/db"
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
+	"text/template"
 
+	log "ai-assistant/internal/logger"
+
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/sheeiavellie/go-yandexgpt"
+	"github.com/tmc/langchaingo/documentloaders"
+	"github.com/tmc/langchaingo/schema"
+	"github.com/tmc/langchaingo/textsplitter"
 )
+
+const QDRANT_COLLECTION_NAME = "real_estate"
 
 type App struct {
 	yandexGptClient *yandexgpt.YandexGPTClient
-	vectorDbClient *qdrant.Client
+	qdrantClient *qdrant.Client
 }
 
 func InitApp(ctx context.Context) (*App, error) {
 	app := &App{}
 	err := godotenv.Load("../.env")
-
 	if err != nil {
 		return nil, err
 	}
-
 	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(os.Getenv("YANDEXGPT_API_KEY")))
-	qdrantClient, err := db.ConnectToQdrant()
+	qdrantClient, err := db.NewQdrantClient()
 
 	if err != nil {
 		return nil, err
 	}
-
-	app.vectorDbClient = qdrantClient
-	defer app.vectorDbClient.Close()
-	db.CreateQdrantCollection(ctx, qdrantClient, "real_estate")
-
+	app.qdrantClient = qdrantClient
+	// ignore error if collection already exists
+	app.qdrantClient.CreateCollection(ctx, &qdrant.CreateCollection{
+		CollectionName: QDRANT_COLLECTION_NAME,
+		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
+			Size:     256,
+			Distance: qdrant.Distance_Cosine,
+		}),
+	})
+	client := app.yandexGptClient
+	chunks, err := textToChunks(ctx, "../internal/prompts/buildings.txt")
+	if err != nil {
+		return nil, err
+	}
+	for _, chunk := range chunks {
+		go func(doc schema.Document) {
+			embedding, err := client.GetEmbedding(ctx, yandexgpt.YandexGPTEmbeddingsRequest{
+				ModelURI: yandexgpt.MakeEmbModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.TextSearchDoc),
+				Text:    doc.PageContent,
+			})
+			if err != nil {
+				log.Error("failed to get embedding", "error", err)
+				return
+			}
+			_, err = qdrantClient.Upsert(ctx, &qdrant.UpsertPoints{
+				CollectionName: QDRANT_COLLECTION_NAME,
+				Points: []*qdrant.PointStruct{
+					{
+						Id: qdrant.NewIDUUID(uuid.NewString()),
+						Vectors: qdrant.NewVectors(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
+					},
+				},
+			})
+			if err != nil {
+				log.Error("failed to upsert chunk", "error", err)
+				return
+			}	
+		}(chunk)
+	}
+	
 	return app, nil
 }
 
 func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, error) {
 	if app == nil {
 		return "", errors.New("app is not initialized")
+	}
+	embedding, err := app.yandexGptClient.GetEmbedding(ctx, yandexgpt.YandexGPTEmbeddingsRequest{
+		ModelURI: yandexgpt.MakeEmbModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.TextSearchDoc),
+		Text:    msg,
+	})
+	if err != nil {
+		return "", err
+	}
+	searchResult, err := app.qdrantClient.Query(ctx, &qdrant.QueryPoints{
+		CollectionName: QDRANT_COLLECTION_NAME,
+		Query: qdrant.NewQuery(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
+	})
+	if err != nil {
+		return "", err
+	}
+	templateData := map[string]any{
+		"Context": searchResult[0].Vectors,
+		"Question": msg,
+	}
+	systemPrompt, err := parsePrompt("../internal/prompts/system.txt", templateData)
+	fmt.Println("systemPrompt", systemPrompt)
+	if err != nil {
+		return "", err
 	}
 	request := yandexgpt.YandexGPTRequest{
 		ModelURI: yandexgpt.MakeModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.YandexGPTLite, yandexgpt.VersionLatest),
@@ -52,7 +119,7 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		Messages: []yandexgpt.YandexGPTMessage{
 			{
 				Role: yandexgpt.YandexGPTMessageRoleSystem,
-				Text: "Ты помощник по недвижимости. Ты помогаешь пользователю найти подходящее жилье.",
+				Text: systemPrompt,
 			},
 			{
 				Role: yandexgpt.YandexGPTMessageRoleUser,
@@ -61,10 +128,52 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		},
 	}
 	response, err := app.yandexGptClient.GetCompletion(ctx, request)
-
 	if err != nil {
 		return "", err
 	}
-
 	return response.Result.Alternatives[0].Message.Text, nil
 }
+
+func parsePrompt(path string, data any) (string, error) {
+	promptContent, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	tmpl, err := template.New("temp").Parse(string(promptContent))
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func convertFloat64VectorToFloat32Vector(embedding []float64) []float32 {
+	float32Vector := make([]float32, len(embedding))
+	for i, val := range embedding {
+		float32Vector[i] = float32(val)
+	}
+	return float32Vector
+}
+
+func textToChunks(ctx context.Context, pathToTextFile string) ([]schema.Document, error) {
+	f, err := os.Open(pathToTextFile)
+	if err != nil {
+		return nil, err
+	}
+	p := documentloaders.NewText(f)
+	split := textsplitter.NewRecursiveCharacter()
+	split.ChunkSize = 100
+	split.ChunkOverlap = 10
+	docs, err := p.LoadAndSplit(ctx, split)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println("docs", docs)
+	return docs, nil
+}
+
+
