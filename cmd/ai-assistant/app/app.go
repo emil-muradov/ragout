@@ -5,9 +5,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"text/template"
+	"time"
 
 	log "ai-assistant/internal/logger"
 
@@ -18,6 +18,7 @@ import (
 	"github.com/tmc/langchaingo/documentloaders"
 	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/textsplitter"
+	"golang.org/x/time/rate"
 )
 
 const QDRANT_COLLECTION_NAME = "real_estate"
@@ -53,8 +54,14 @@ func InitApp(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	limiter := rate.NewLimiter(rate.Every(500*time.Millisecond), 2)
 	for _, chunk := range chunks {
 		go func(doc schema.Document) {
+			err := limiter.Wait(ctx)
+			if err != nil {
+				log.Error("rate limiter: failed to wait", "error", err)
+				return
+			}
 			embedding, err := client.GetEmbedding(ctx, yandexgpt.YandexGPTEmbeddingsRequest{
 				ModelURI: yandexgpt.MakeEmbModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.TextSearchDoc),
 				Text:    doc.PageContent,
@@ -105,7 +112,6 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		"Question": msg,
 	}
 	systemPrompt, err := parsePrompt("../internal/prompts/system.txt", templateData)
-	fmt.Println("systemPrompt", systemPrompt)
 	if err != nil {
 		return "", err
 	}
@@ -172,7 +178,6 @@ func textToChunks(ctx context.Context, pathToTextFile string) ([]schema.Document
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("docs", docs)
 	return docs, nil
 }
 
