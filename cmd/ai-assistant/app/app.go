@@ -25,7 +25,7 @@ const QDRANT_COLLECTION_NAME = "real_estate"
 
 type App struct {
 	yandexGptClient *yandexgpt.YandexGPTClient
-	qdrantClient *qdrant.Client
+	qdrantClient    *qdrant.Client
 }
 
 func InitApp(ctx context.Context) (*App, error) {
@@ -36,18 +36,28 @@ func InitApp(ctx context.Context) (*App, error) {
 	}
 	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(os.Getenv("YANDEXGPT_API_KEY")))
 	qdrantClient, err := db.NewQdrantClient()
-
 	if err != nil {
 		return nil, err
 	}
 	app.qdrantClient = qdrantClient
-	// ignore error if collection already exists
+	exists, err := app.qdrantClient.CollectionExists(ctx, QDRANT_COLLECTION_NAME)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return app, nil
+	}
 	app.qdrantClient.CreateCollection(ctx, &qdrant.CreateCollection{
 		CollectionName: QDRANT_COLLECTION_NAME,
 		VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
 			Size:     256,
 			Distance: qdrant.Distance_Cosine,
 		}),
+	})
+	app.qdrantClient.CreateFieldIndex(context.Background(), &qdrant.CreateFieldIndexCollection{
+		CollectionName: QDRANT_COLLECTION_NAME,
+		FieldName:      "description",
+		FieldType:      qdrant.FieldType_FieldTypeText.Enum(),
 	})
 	client := app.yandexGptClient
 	chunks, err := textToChunks(ctx, "../internal/prompts/buildings.txt")
@@ -64,7 +74,7 @@ func InitApp(ctx context.Context) (*App, error) {
 			}
 			embedding, err := client.GetEmbedding(ctx, yandexgpt.YandexGPTEmbeddingsRequest{
 				ModelURI: yandexgpt.MakeEmbModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.TextSearchDoc),
-				Text:    doc.PageContent,
+				Text:     doc.PageContent,
 			})
 			if err != nil {
 				log.Error("failed to get embedding", "error", err)
@@ -74,18 +84,20 @@ func InitApp(ctx context.Context) (*App, error) {
 				CollectionName: QDRANT_COLLECTION_NAME,
 				Points: []*qdrant.PointStruct{
 					{
-						Id: qdrant.NewIDUUID(uuid.NewString()),
+						Id:      qdrant.NewIDUUID(uuid.NewString()),
 						Vectors: qdrant.NewVectors(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
+						Payload: qdrant.NewValueMap(map[string]any{
+							"description": doc.PageContent,
+						}),
 					},
 				},
 			})
 			if err != nil {
 				log.Error("failed to upsert chunk", "error", err)
 				return
-			}	
+			}
 		}(chunk)
 	}
-	
 	return app, nil
 }
 
@@ -95,23 +107,39 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 	}
 	embedding, err := app.yandexGptClient.GetEmbedding(ctx, yandexgpt.YandexGPTEmbeddingsRequest{
 		ModelURI: yandexgpt.MakeEmbModelURI(os.Getenv("YANDEX_CATALOG_ID"), yandexgpt.TextSearchDoc),
-		Text:    msg,
+		Text:     msg,
 	})
 	if err != nil {
 		return "", err
 	}
 	searchResult, err := app.qdrantClient.Query(ctx, &qdrant.QueryPoints{
 		CollectionName: QDRANT_COLLECTION_NAME,
-		Query: qdrant.NewQuery(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
+		Query:          qdrant.NewQuery(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
 	})
 	if err != nil {
 		return "", err
 	}
+	pointsIds := make([]*qdrant.PointId, len(searchResult))
+	for i, result := range searchResult {
+		pointsIds[i] = qdrant.NewIDUUID(result.Id.GetUuid())
+	}
+	points, err := app.qdrantClient.Get(ctx, &qdrant.GetPoints{
+		CollectionName: QDRANT_COLLECTION_NAME,
+		Ids:            pointsIds,
+		WithPayload:    qdrant.NewWithPayload(true),
+	})
+	if err != nil {
+		return "", err
+	}
+	context := make([]string, len(points))
+	for i, point := range points {
+		context[i] = point.Payload["description"].GetStringValue()
+	}
 	templateData := map[string]any{
-		"Context": searchResult[0].Vectors,
+		"Context":  context,
 		"Question": msg,
 	}
-	systemPrompt, err := parsePrompt("../internal/prompts/system.txt", templateData)
+	augmentedPrompt, err := parsePrompt("../internal/prompts/system.txt", templateData)
 	if err != nil {
 		return "", err
 	}
@@ -125,11 +153,7 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		Messages: []yandexgpt.YandexGPTMessage{
 			{
 				Role: yandexgpt.YandexGPTMessageRoleSystem,
-				Text: systemPrompt,
-			},
-			{
-				Role: yandexgpt.YandexGPTMessageRoleUser,
-				Text: msg,
+				Text: augmentedPrompt,
 			},
 		},
 	}
@@ -172,13 +196,11 @@ func textToChunks(ctx context.Context, pathToTextFile string) ([]schema.Document
 	}
 	p := documentloaders.NewText(f)
 	split := textsplitter.NewRecursiveCharacter()
-	split.ChunkSize = 100
-	split.ChunkOverlap = 10
+	split.ChunkSize = 200
+	split.ChunkOverlap = 50
 	docs, err := p.LoadAndSplit(ctx, split)
 	if err != nil {
 		return nil, err
 	}
 	return docs, nil
 }
-
-
