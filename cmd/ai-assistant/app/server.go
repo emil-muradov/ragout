@@ -26,10 +26,10 @@ func main() {
 		logger.Error("failed to initialize app", "error", err)
 		return
 	}
-	logger.Info("app started")
+	logger.Info("app initialized")
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "ready to serve!")
+		io.WriteString(w, "ready to serve")
 	})
 	router.HandleFunc("POST /ask", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
@@ -41,15 +41,9 @@ func main() {
 		response, err := app.ProcessUserRequest(ctx, userRequest.Msg)
 		encoder := json.NewEncoder(w)
 		if err != nil {
-			err := encoder.Encode(Response{Status: http.StatusInternalServerError, Message: err.Error()})
-			if err != nil {
-				return
-			}
+			encoder.Encode(Response{Status: http.StatusInternalServerError, Message: err.Error()})
 		} else {
-			err := encoder.Encode(Response{Status: http.StatusOK, Message: response})
-			if err != nil {
-				return
-			}
+			encoder.Encode(Response{Status: http.StatusOK, Message: response})
 		}
 	})
 	err = http.ListenAndServe(":8080", router)
