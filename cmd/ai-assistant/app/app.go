@@ -54,7 +54,7 @@ func InitApp(ctx context.Context) (*App, error) {
 			Distance: qdrant.Distance_Cosine,
 		}),
 	})
-	app.qdrantClient.CreateFieldIndex(context.Background(), &qdrant.CreateFieldIndexCollection{
+	app.qdrantClient.CreateFieldIndex(ctx, &qdrant.CreateFieldIndexCollection{
 		CollectionName: QDRANT_COLLECTION_NAME,
 		FieldName:      "description",
 		FieldType:      qdrant.FieldType_FieldTypeText.Enum(),
@@ -197,7 +197,8 @@ func textToChunks(ctx context.Context, pathToTextFile string) ([]schema.Document
 	p := documentloaders.NewText(f)
 	split := textsplitter.NewRecursiveCharacter()
 	split.ChunkSize = 200
-	split.ChunkOverlap = 50
+	split.ChunkOverlap = 20
+	split.Separators = []string{"\n\n"}
 	docs, err := p.LoadAndSplit(ctx, split)
 	if err != nil {
 		return nil, err
