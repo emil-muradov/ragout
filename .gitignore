@@ -3,10 +3,8 @@
 !*.md
 !*.go
 !*.sh
-!*.yml
+!*.py
 !*.yaml
 !*.json
-!*.toml
-!*.ini
-!*.conf
-!*.log
+!*.mod
+!*.sum

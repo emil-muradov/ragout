@@ -1,11 +1,13 @@
 package main
 
 import (
-	log "ai-assistant/internal/logger"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+
+	applicaton "ragout/cmd/ai-assistant/app"
+	log "ragout/cmd/ai-assistant/internal/logger"
 )
 
 type Response struct {
@@ -21,7 +23,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := log.CreateLogger()
-	app, err := InitApp(ctx)
+	app, err := applicaton.InitApp(ctx)
 	if err != nil {
 		logger.Error("failed to initialize app", "error", err)
 		return
@@ -29,7 +31,7 @@ func main() {
 	logger.Info("app initialized")
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		io.WriteString(w, "ready to serve")
+		io.WriteString(w, "OK")
 	})
 	router.HandleFunc("POST /ask", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)

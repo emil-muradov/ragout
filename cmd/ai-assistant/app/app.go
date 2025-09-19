@@ -1,23 +1,21 @@
-package main
+package app
 
 import (
-	db "ai-assistant/internal/db"
-	"bytes"
 	"context"
 	"errors"
 	"os"
-	"text/template"
+	"path/filepath"
 	"time"
 
-	log "ai-assistant/internal/logger"
+	"ragout/cmd/ai-assistant/internal/db"
+	log "ragout/cmd/ai-assistant/internal/logger"
+	"ragout/cmd/ai-assistant/internal/utils"
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/sheeiavellie/go-yandexgpt"
-	"github.com/tmc/langchaingo/documentloaders"
 	"github.com/tmc/langchaingo/schema"
-	"github.com/tmc/langchaingo/textsplitter"
 	"golang.org/x/time/rate"
 )
 
@@ -30,7 +28,7 @@ type App struct {
 
 func InitApp(ctx context.Context) (*App, error) {
 	app := &App{}
-	err := godotenv.Load("../.env")
+	err := godotenv.Load()
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +58,11 @@ func InitApp(ctx context.Context) (*App, error) {
 		FieldType:      qdrant.FieldType_FieldTypeText.Enum(),
 	})
 	client := app.yandexGptClient
-	chunks, err := textToChunks(ctx, "../internal/prompts/buildings.txt")
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	chunks, err := utils.TextToChunks(ctx, filepath.Join(dir, "internal/prompts/buildings.txt"))
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +87,7 @@ func InitApp(ctx context.Context) (*App, error) {
 				Points: []*qdrant.PointStruct{
 					{
 						Id:      qdrant.NewIDUUID(uuid.NewString()),
-						Vectors: qdrant.NewVectors(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
+						Vectors: qdrant.NewVectors(utils.ConvertFloat64VectorToFloat32Vector(embedding.Embedding)...),
 						Payload: qdrant.NewValueMap(map[string]any{
 							"description": doc.PageContent,
 						}),
@@ -114,7 +116,7 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 	}
 	searchResult, err := app.qdrantClient.Query(ctx, &qdrant.QueryPoints{
 		CollectionName: QDRANT_COLLECTION_NAME,
-		Query:          qdrant.NewQuery(convertFloat64VectorToFloat32Vector(embedding.Embedding)...),
+		Query:          qdrant.NewQuery(utils.ConvertFloat64VectorToFloat32Vector(embedding.Embedding)...),
 	})
 	if err != nil {
 		return "", err
@@ -139,7 +141,11 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		"Context":  context,
 		"Question": msg,
 	}
-	augmentedPrompt, err := parsePrompt("../internal/prompts/system.txt", templateData)
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	augmentedPrompt, err := utils.ParsePrompt(filepath.Join(dir, "internal/prompts/system.txt"), templateData)
 	if err != nil {
 		return "", err
 	}
@@ -162,46 +168,4 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		return "", err
 	}
 	return response.Result.Alternatives[0].Message.Text, nil
-}
-
-func parsePrompt(path string, data any) (string, error) {
-	promptContent, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	tmpl, err := template.New("temp").Parse(string(promptContent))
-	if err != nil {
-		return "", err
-	}
-	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, data)
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-func convertFloat64VectorToFloat32Vector(embedding []float64) []float32 {
-	float32Vector := make([]float32, len(embedding))
-	for i, val := range embedding {
-		float32Vector[i] = float32(val)
-	}
-	return float32Vector
-}
-
-func textToChunks(ctx context.Context, pathToTextFile string) ([]schema.Document, error) {
-	f, err := os.Open(pathToTextFile)
-	if err != nil {
-		return nil, err
-	}
-	p := documentloaders.NewText(f)
-	split := textsplitter.NewRecursiveCharacter()
-	split.ChunkSize = 200
-	split.ChunkOverlap = 20
-	split.Separators = []string{"\n\n"}
-	docs, err := p.LoadAndSplit(ctx, split)
-	if err != nil {
-		return nil, err
-	}
-	return docs, nil
 }
