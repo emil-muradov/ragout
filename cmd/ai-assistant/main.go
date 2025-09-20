@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 
-	applicaton "ragout/cmd/ai-assistant/app"
+	aiassistant "ragout/cmd/ai-assistant/app"
 	log "ragout/cmd/ai-assistant/internal/logger"
 )
 
@@ -23,7 +23,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	logger := log.CreateLogger()
-	app, err := applicaton.InitApp(ctx)
+	app, err := aiassistant.InitApp(ctx)
 	if err != nil {
 		logger.Error("failed to initialize app", "error", err)
 		return
