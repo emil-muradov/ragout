@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"os"
-	"path/filepath"
 	"time"
 
 	"ragout/cmd/ai-assistant/internal/db"
@@ -12,7 +11,6 @@ import (
 	"ragout/cmd/ai-assistant/internal/utils"
 
 	"github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"github.com/qdrant/go-client/qdrant"
 	"github.com/sheeiavellie/go-yandexgpt"
 	"github.com/tmc/langchaingo/schema"
@@ -28,10 +26,6 @@ type App struct {
 
 func InitApp(ctx context.Context) (*App, error) {
 	app := &App{}
-	err := godotenv.Load()
-	if err != nil {
-		return nil, err
-	}
 	app.yandexGptClient = yandexgpt.New(yandexgpt.CfgApiKey(os.Getenv("YANDEXGPT_API_KEY")))
 	qdrantClient, err := db.NewQdrantClient()
 	if err != nil {
@@ -58,11 +52,7 @@ func InitApp(ctx context.Context) (*App, error) {
 		FieldType:      qdrant.FieldType_FieldTypeText.Enum(),
 	})
 	client := app.yandexGptClient
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	chunks, err := utils.TextToChunks(ctx, filepath.Join(dir, "internal/prompts/buildings.txt"))
+	chunks, err := utils.TextToChunks(ctx, "./internal/prompts/buildings.txt")
 	if err != nil {
 		return nil, err
 	}
@@ -141,11 +131,7 @@ func (app *App) ProcessUserRequest(ctx context.Context, msg string) (string, err
 		"Context":  context,
 		"Question": msg,
 	}
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	augmentedPrompt, err := utils.ParsePrompt(filepath.Join(dir, "internal/prompts/system.txt"), templateData)
+	augmentedPrompt, err := utils.ParsePrompt("./internal/prompts/system.txt", templateData)
 	if err != nil {
 		return "", err
 	}
