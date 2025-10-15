@@ -1,6 +1,7 @@
 FROM golang:1.25.1-alpine
 
-MAINTAINER Emil Muradov <emil.muradov22@gmail.com>
+LABEL maintainer="Emil Muradov <emil.muradov22@gmail.com>"
+LABEL version="0.1"
 
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
