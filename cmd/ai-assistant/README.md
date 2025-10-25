@@ -4,7 +4,7 @@ An example of implementing RAG (Retrieval Augmented Generation)  with Go, Yandex
 The domain itself is real estate in Saint Petersburg city (Russia). It is best to provide a request in russian language.
 
 
-Make sure you are in a project root<br>
+Make sure you are at the root of the project<br>
 Start server:
 ```
 docker build -f cmd/ai-assistant/Dockerfile .
