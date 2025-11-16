@@ -1,3 +1,3 @@
-# Ragout A Monorepo
+### Ragout A Monorepo
 
-There are supposed to be different apps in /cmd
+Apps are located in `/cmd`. Each app has its own README describing the purpose of the app and how to set it up on your machine.
