@@ -1,11 +1,1 @@
-*
-!*.txt
-!*.md
-!*.go
-!*.sh
-!*.py
-!*.yaml
-!*.json
-!*.mod
-!*.sum
-!Dockerfile
+.env

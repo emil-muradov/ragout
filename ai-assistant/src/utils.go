@@ -1,4 +1,4 @@
-package utils
+package aiassistant
 
 import (
 	"bytes"

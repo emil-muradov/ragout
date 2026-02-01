@@ -1,4 +1,4 @@
-package logger
+package aiassistant
 
 import (
 	"log/slog"

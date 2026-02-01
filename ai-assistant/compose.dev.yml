@@ -1,8 +1,8 @@
 services:
   ai-assistant:
     build:
-      context: ../../
-      dockerfile: ./cmd/ai-assistant/Dockerfile
+      context: .
+      dockerfile: Dockerfile
     develop:
       watch:
         - action: rebuild
@@ -10,13 +10,12 @@ services:
     ports:
       - 8080:8080
     environment:
-      - YANDEXGPT_API_KEY=${YANDEXGPT_API_KEY}
+      - YANDEX_GPT_API_KEY=${YANDEX_GPT_API_KEY}
       - YANDEX_CATALOG_ID=${YANDEX_CATALOG_ID}
       - QDRANT_HOST=${QDRANT_HOST}
       - QDRANT_PORT=${QDRANT_PORT}
 
-
   qdrant:
     image: qdrant/qdrant:latest
     ports:
-      - 6333:6333
+      - 6334:6334

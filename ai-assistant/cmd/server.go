@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 
-	aiassistant "ragout/cmd/ai-assistant/app"
-	log "ragout/cmd/ai-assistant/internal/logger"
+	aiassistant "github.com/emil-muradov/ragout/ai-assistant/src"
 )
 
 type Response struct {
@@ -15,20 +15,20 @@ type Response struct {
 	Message string `json:"message"`
 }
 
-type UserRequest struct {
-	Msg string `json:"msg"`
+type Request struct {
+	Question string `json:"question"`
 }
 
 func main() {
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	logger := log.CreateLogger()
 	app, err := aiassistant.InitApp(ctx)
 	if err != nil {
-		logger.Error("failed to initialize app", "error", err)
+		log.Println("failed to initialize app", "error", err)
 		return
 	}
-	logger.Info("app initialized")
+	log.Println("app initialized")
 	router := http.NewServeMux()
 	router.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		io.WriteString(w, "OK")
@@ -38,10 +38,14 @@ func main() {
 		if err != nil {
 			return
 		}
-		var userRequest UserRequest
-		json.Unmarshal(body, &userRequest)
-		response, err := app.ProcessUserRequest(ctx, userRequest.Msg)
+		var request Request
 		encoder := json.NewEncoder(w)
+		err = json.Unmarshal(body, &request)
+		if err != nil {
+			encoder.Encode(Response{Status: http.StatusBadRequest, Message: err.Error()})
+			return
+		}
+		response, err := app.ProcessUserRequest(ctx, request.Question)
 		if err != nil {
 			encoder.Encode(Response{Status: http.StatusInternalServerError, Message: err.Error()})
 		} else {
@@ -50,7 +54,7 @@ func main() {
 	})
 	err = http.ListenAndServe(":8080", router)
 	if err != nil {
-		logger.Error("failed to start server", "error", err)
+		log.Println("failed to start server", "error", err)
 		return
 	}
 }

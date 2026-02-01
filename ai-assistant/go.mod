@@ -1,13 +1,13 @@
-module ragout
+module github.com/emil-muradov/ragout/ai-assistant
 
-go 1.24.4
+go 1.25.4
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/qdrant/go-client v1.15.2
+	github.com/qdrant/go-client v1.16.2
 	github.com/sheeiavellie/go-yandexgpt v1.8.0
-	github.com/tmc/langchaingo v0.1.13
-	golang.org/x/time v0.13.0
+	github.com/tmc/langchaingo v0.1.14
+	golang.org/x/time v0.14.0
 )
 
 require (
@@ -19,7 +19,7 @@ require (
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.6 // indirect
+	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.26 // indirect
 	github.com/pkoukk/tiktoken-go v0.1.6 // indirect
@@ -28,12 +28,11 @@ require (
 	gitlab.com/golang-commonmark/markdown v0.0.0-20211110145824-bf3e522c626a // indirect
 	gitlab.com/golang-commonmark/mdurl v0.0.0-20191124015652-932350d1cb84 // indirect
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
-	golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // indirect
-	golang.org/x/net v0.28.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed // indirect
-	google.golang.org/grpc v1.66.0 // indirect
-	google.golang.org/protobuf v1.34.2 // indirect
+	golang.org/x/net v0.47.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
+	golang.org/x/text v0.31.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251111163417-95abcf5c77ba // indirect
+	google.golang.org/grpc v1.76.0 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
